@@ -1475,12 +1475,15 @@
         }
     </script>
 
+    <script src="supabase-config.js"></script>
     <script>
         const guestbookList = document.getElementById('guestbookList');
+        const supabaseConfig = window.GUESTBOOK_SUPABASE;
 
         async function readGuestbookResponse(response) {
-            if (!response.headers.get('content-type')?.includes('application/json')) {
-                throw new Error('Unable to load birthday wishes.');
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                throw new Error(response.statusText || 'Unable to load birthday wishes.');
             }
             return response.json();
         }
@@ -1512,12 +1515,32 @@
         let guestbookLoaded = false;
 
         async function loadGuestbook() {
-            const response = await fetch('/api/messages?source=FinalHBD');
+            if (!supabaseConfig?.url || !supabaseConfig.anonKey) {
+                throw new Error('Online wishes are not configured yet.');
+            }
+            const query = new URLSearchParams({
+                select: 'name,message,created_at',
+                source: 'eq.FinalHBD',
+                order: 'created_at.asc',
+                limit: '100'
+            });
+            const response = await fetch(
+                `${supabaseConfig.url}/rest/v1/guestbook_messages?${query}`,
+                {
+                    headers: {
+                        'apikey': supabaseConfig.anonKey,
+                        'Authorization': `Bearer ${supabaseConfig.anonKey}`
+                    }
+                }
+            );
             const result = await readGuestbookResponse(response);
             if (!response.ok) {
-                throw new Error(result.error || 'Could not load birthday wishes.');
+                throw new Error(result.message || result.error_description || result.error || 'Could not load birthday wishes.');
             }
-            renderGuestbook(result.messages);
+            if (!Array.isArray(result)) {
+                throw new Error('The birthday wishes response was invalid.');
+            }
+            renderGuestbook(result);
             guestbookLoaded = true;
         }
 

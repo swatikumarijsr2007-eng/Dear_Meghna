@@ -9,6 +9,7 @@ create table if not exists public.guestbook_messages (
 alter table public.guestbook_messages enable row level security;
 
 grant insert on public.guestbook_messages to anon;
+grant select on public.guestbook_messages to anon;
 
 drop policy if exists "Anyone can submit a birthday wish"
     on public.guestbook_messages;
@@ -17,3 +18,11 @@ create policy "Anyone can submit a birthday wish"
     for insert
     to anon
     with check (source = 'FinalHBD');
+
+drop policy if exists "Anyone can view birthday wishes"
+    on public.guestbook_messages;
+create policy "Anyone can view birthday wishes"
+    on public.guestbook_messages
+    for select
+    to anon
+    using (source = 'FinalHBD');
