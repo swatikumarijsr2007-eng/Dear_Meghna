@@ -129,7 +129,7 @@ class BirthdayRequestHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer(("0.0.0.0", 8000), BirthdayRequestHandler)
+    server = ThreadingHTTPServer(("127.0.0.1", 8000), BirthdayRequestHandler)
     print("Birthday website running at http://localhost:8000/")
     print("Stop the server with Ctrl+C.")
     try:

@@ -626,18 +626,22 @@
         <p class="guestbook-status" id="guestbookStatus" role="status" aria-live="polite"></p>
     </section>
 
+    <script src="supabase-config.js"></script>
     <script>
         const guestbookToggle = document.getElementById('guestbookToggle');
         const guestbookPanel = document.getElementById('guestbookPanel');
         const guestbookForm = document.getElementById('guestbookForm');
         const guestbookStatus = document.getElementById('guestbookStatus');
         const guestbookSubmit = document.getElementById('guestbookSubmit');
+        const supabaseConfig = window.GUESTBOOK_SUPABASE;
 
-        async function readGuestbookResponse(response) {
-            if (!response.headers.get('content-type')?.includes('application/json')) {
-                throw new Error('Could not send your wish.');
+        async function readGuestbookError(response) {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const result = await response.json();
+                return result.message || result.error_description || result.error;
             }
-            return response.json();
+            return response.statusText;
         }
 
         guestbookToggle.addEventListener('click', () => {
@@ -654,24 +658,34 @@
             guestbookSubmit.disabled = true;
             guestbookStatus.textContent = 'Saving your wish...';
             try {
+                if (!supabaseConfig?.url || !supabaseConfig.anonKey) {
+                    throw new Error('Online wishes are not configured yet. Add the Supabase publishable key in supabase-config.js.');
+                }
                 const formData = new FormData(guestbookForm);
-                const response = await fetch('/api/messages', {
+                const response = await fetch(`${supabaseConfig.url}/rest/v1/guestbook_messages`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'apikey': supabaseConfig.anonKey,
+                        'Authorization': `Bearer ${supabaseConfig.anonKey}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'return=minimal'
+                    },
                     body: JSON.stringify({
-                        name: formData.get('name'),
-                        message: formData.get('message'),
+                        name: formData.get('name').trim(),
+                        message: formData.get('message').trim(),
                         source: 'FinalHBD'
                     })
                 });
-                const result = await readGuestbookResponse(response);
                 if (!response.ok) {
-                    throw new Error(result.error || 'Could not save your wish.');
+                    const error = await readGuestbookError(response);
+                    throw new Error(error || `Could not save your wish (HTTP ${response.status}).`);
                 }
                 guestbookForm.reset();
                 guestbookStatus.textContent = 'Your birthday wish has been shared! 💜';
             } catch (error) {
-                guestbookStatus.textContent = error.message;
+                guestbookStatus.textContent = error instanceof Error
+                    ? error.message
+                    : 'Could not save your wish. Please try again.';
             } finally {
                 guestbookSubmit.disabled = false;
             }
